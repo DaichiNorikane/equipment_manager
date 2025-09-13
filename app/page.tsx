@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import Link from "next/link";
 import type { Event, EventUsage, Equipment, Rental } from "@/lib/types";
 
 type ShortageInterval = { start_at: string; end_at: string; shortage: number; rental_used: number; arranged_ok: boolean };
@@ -172,9 +173,12 @@ export default function Dashboard() {
                     : `不足 ${iv.shortage}${iv.rental_used ? `（内レンタル ${iv.rental_used} 台）` : ''}`;
                   const cls = (iv.shortage > 0 || (iv.rental_used > 0 && !iv.arranged_ok)) ? 'pill danger' : 'pill';
                   return (
-                    <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <div className="subtle">{new Date(iv.start_at).toLocaleString()} - {new Date(iv.end_at).toLocaleString()}</div>
-                      <span className={cls}>{label}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className={cls}>{label}</span>
+                        <Link className="btn" href="/rentals">レンタル</Link>
+                      </div>
                     </div>
                   );
                 })}

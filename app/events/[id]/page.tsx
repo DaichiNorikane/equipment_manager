@@ -223,13 +223,11 @@ export default function EventDetailPage() {
           const selectedIds = rows.map(x => x.equipment_id).filter(Boolean);
           const colors = pastel(r.category_id || (equipments.find(e => e.id === r.equipment_id)?.manufacturer || ''));
           return (
-            <div key={r.id ?? `new-${idx}`} className="row wide" style={{
+            <div key={r.id ?? `new-${idx}`} className="row event-row" style={{
                 background: colors.bg,
                 border: `1px solid ${colors.border}`,
                 borderRadius: 10,
                 padding: 8,
-                // カテゴリ | 機材(内容に応じて可変) | 数量 | 備考 | 削除
-                gridTemplateColumns: '1fr auto 70px 1.2fr 80px',
                 alignItems: 'center'
               }}>
                 <select
@@ -258,7 +256,7 @@ export default function EventDetailPage() {
                 </select>
                 <input style={{ width: 70 }} type="number" min={1} value={r.quantity} onChange={e => updateRow(idx, { quantity: Number(e.target.value) })} />
                 <input placeholder="備考" value={r.notes || ''} onChange={e => updateRow(idx, { notes: e.target.value })} />
-                <button className="btn" type="button" onClick={() => removeRow(idx)}>削除</button>
+                <button className="btn delete-btn" type="button" onClick={() => removeRow(idx)}>削除</button>
                 {(() => {
                   const eq = equipments.find(e => e.id === r.equipment_id);
                   if (!eq) return null;

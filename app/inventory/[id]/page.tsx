@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Equipment, Event } from "@/lib/types";
+import { useAdminMode } from "@/lib/useAdminMode";
 
 export default function EquipmentDetail() {
   const params = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ export default function EquipmentDetail() {
   const [assign, setAssign] = useState<{ event_id: string; quantity: number }>({ event_id: "", quantity: 1 });
   const [imageBusy, setImageBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const { admin } = useAdminMode();
 
   useEffect(() => {
     const load = async () => {
@@ -98,6 +100,31 @@ export default function EquipmentDetail() {
     setImageBusy(false);
   };
 
+  const pathFromUrl = (u: string) => {
+    const re = /\/object\/public\/equipment-images\/(.+)$/;
+    const m = u.match(re);
+    return m ? m[1] : null;
+  };
+
+  const deleteImage = async (idx: number) => {
+    if (!eq || !id) return;
+    const url = images[idx];
+    const path = pathFromUrl(url);
+    if (!path) { alert('削除用のパスが解析できませんでした'); return; }
+    setImageBusy(true);
+    const { error: remErr } = await supabase.storage.from('equipment-images').remove([path]);
+    if (remErr) { alert(`画像の削除に失敗しました: ${remErr.message}`); setImageBusy(false); return; }
+    const nextImages = images.filter((_, i) => i !== idx);
+    const nextProps = { ...((eq as any).properties || {}), images: nextImages };
+    const { error: upEq } = await supabase.from('equipments').update({ properties: nextProps } as any).eq('id', id);
+    if (upEq) { alert(upEq.message); }
+    else {
+      const { data } = await supabase.from('equipments').select('*').eq('id', id).single();
+      setEq((data as Equipment) || eq);
+    }
+    setImageBusy(false);
+  };
+
   return (
     <div className="stack">
       <h2 className="page-title">機材詳細</h2>
@@ -140,8 +167,14 @@ export default function EquipmentDetail() {
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {images.map((src, i) => (
-              <img key={i} src={src} alt="thumb" onClick={() => setPreview(src)}
-                   style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--border)' }} />
+              <div key={i} style={{ position: 'relative' }}>
+                <img src={src} alt="thumb" onClick={() => setPreview(src)}
+                     style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--border)' }} />
+                {admin && (
+                  <button className="btn danger" title="削除" onClick={(e) => { e.stopPropagation(); deleteImage(i); }}
+                          style={{ position: 'absolute', top: -6, right: -6, padding: '2px 6px' }}>×</button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -150,7 +183,19 @@ export default function EquipmentDetail() {
       {preview && (
         <div onClick={() => setPreview(null)}
              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'grid', placeItems: 'center', zIndex: 50 }}>
-          <img src={preview} alt="preview" style={{ maxWidth: '95vw', maxHeight: '90vh', borderRadius: 8 }} />
+          <div style={{ position: 'relative' }}>
+            <img src={preview} alt="preview" style={{ maxWidth: '95vw', maxHeight: '90vh', borderRadius: 8 }} />
+            {admin && (
+              <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                <button className="btn danger" onClick={(e) => {
+                  e.stopPropagation();
+                  const idx = images.indexOf(preview);
+                  if (idx >= 0) deleteImage(idx);
+                  setPreview(null);
+                }}>削除</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
