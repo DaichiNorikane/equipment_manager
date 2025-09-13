@@ -171,8 +171,15 @@ export default function InventoryPage() {
           </div>
         );})}
       </div>
-
-      {admin && <ManufacturersAdmin equipments={equipments} onChanged={reload} />}
+      {admin && (
+        <>
+          <CategoriesAdmin categories={categories} onChanged={async () => {
+            const { data: cats } = await supabase.from('categories').select('*').order('name');
+            setCategories((cats || []) as Category[]);
+          }} />
+          <ManufacturersAdmin equipments={equipments} onChanged={reload} />
+        </>
+      )}
     </div>
   );
 }
@@ -206,6 +213,39 @@ function ManufacturersAdmin({ equipments, onChanged }: { equipments: Equipment[]
           ))}
         </div>
       </details>
+    </div>
+  );
+}
+
+function CategoriesAdmin({ categories, onChanged }: { categories: Category[]; onChanged: () => void }) {
+  const [editing, setEditing] = useState<Record<string, string>>({});
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div className="section-title">カテゴリ管理（編集・削除・管理者）</div>
+      <div className="list">
+        {categories.map(c => (
+          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+            <input
+              value={editing[c.id] ?? c.name}
+              onChange={e => setEditing(prev => ({ ...prev, [c.id]: e.target.value }))}
+            />
+            <button className="btn" onClick={async () => {
+              const name = (editing[c.id] ?? c.name).trim();
+              if (!name) { alert('名前を入力してください'); return; }
+              const { error } = await supabase.from('categories').update({ name }).eq('id', c.id);
+              if (error) { alert(error.message); return; }
+              setEditing(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+              await onChanged();
+            }}>保存</button>
+            <button className="btn danger" onClick={async () => {
+              if (!confirm(`カテゴリ「${c.name}」を削除しますか？（紐づく機材のカテゴリは未設定になります）`)) return;
+              const { error } = await supabase.from('categories').delete().eq('id', c.id);
+              if (error) { alert(error.message); return; }
+              await onChanged();
+            }}>削除</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
