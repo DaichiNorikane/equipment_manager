@@ -134,10 +134,15 @@ export default function InventoryPage() {
           const cat = categories.find(c => c.id === e.category_id);
           const colors = pastel(e.category_id || e.manufacturer);
           const now = new Date();
-          const actives = rentals.filter(r => r.equipment_id === e.id && new Date(r.arrive_at) <= now && new Date(r.return_at) >= now);
+          const eqRentals = rentals.filter(r => r.equipment_id === e.id);
+          const actives = eqRentals.filter(r => new Date(r.arrive_at) <= now && new Date(r.return_at) >= now);
+          const upcoming = eqRentals
+            .filter(r => new Date(r.arrive_at) > now)
+            .sort((a,b) => new Date(a.arrive_at).getTime() - new Date(b.arrive_at).getTime());
           const rentSum = actives.reduce((s, r) => s + (r.quantity || 0), 0);
-          const start = actives.length ? new Date(Math.min(...actives.map(r => new Date(r.arrive_at).getTime()))) : null;
-          const end = actives.length ? new Date(Math.max(...actives.map(r => new Date(r.return_at).getTime()))) : null;
+          const start = actives.length ? new Date(Math.min(...actives.map(r => new Date(r.arrive_at).getTime()))) : (upcoming[0] ? new Date(upcoming[0].arrive_at) : null);
+          const end = actives.length ? new Date(Math.max(...actives.map(r => new Date(r.return_at).getTime()))) : (upcoming[0] ? new Date(upcoming[0].return_at) : null);
+          const label = actives.length > 0 ? `レンタル ${rentSum} 台` : (upcoming.length > 0 ? `次回レンタル ${upcoming[0].quantity} 台` : '');
           return (
           <div key={e.id} className="card" style={{ background: colors.bg, borderColor: colors.border }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -159,9 +164,9 @@ export default function InventoryPage() {
             </div>
             <div className="subtle">
               在庫: {e.stock_count}
-              {rentSum > 0 && (
+              {(actives.length > 0 || upcoming.length > 0) && (
                 <span style={{ marginLeft: 8 }}>
-                  | <Link href="/rentals">レンタル {rentSum} 台</Link>
+                  | <Link href="/rentals">{label}</Link>
                   {start && end && (
                     <span>（{start.toLocaleDateString()} - {end.toLocaleDateString()}）</span>
                   )}

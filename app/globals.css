@@ -69,5 +69,20 @@ label { display: block; font-size: 13px; color: var(--muted); }
 .pill.warn { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .pill.ok { background: #dcfce7; color: #065f46; border-color: #bbf7d0; }
 
+/* Responsive */
+@media (max-width: 820px) {
+  .layout { display: block; }
+  .sidebar { width: 100%; position: sticky; top: 0; z-index: 10; padding: 12px 12px; }
+  .brand { font-size: 18px; }
+  .nav { display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; }
+  .nav a { padding: 8px 10px; font-size: 14px; }
+  .main { padding: 12px; }
+  .page-title { font-size: 20px; }
+  .card { padding: 12px; }
+  .toolbar { gap: 10px; }
+  .row { grid-template-columns: 1fr 110px 80px; }
+  .row.wide { grid-template-columns: 1fr 1fr 110px 80px; }
+}
+
 .section-title { font-weight: 700; margin: 8px 0; }
 .divider { border-top: 1px solid var(--border); margin: 8px 0; }
