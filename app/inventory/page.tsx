@@ -142,7 +142,10 @@ export default function InventoryPage() {
           const rentSum = actives.reduce((s, r) => s + (r.quantity || 0), 0);
           const start = actives.length ? new Date(Math.min(...actives.map(r => new Date(r.arrive_at).getTime()))) : (upcoming[0] ? new Date(upcoming[0].arrive_at) : null);
           const end = actives.length ? new Date(Math.max(...actives.map(r => new Date(r.return_at).getTime()))) : (upcoming[0] ? new Date(upcoming[0].return_at) : null);
-          const label = actives.length > 0 ? `レンタル ${rentSum} 台` : (upcoming.length > 0 ? `次回レンタル ${upcoming[0].quantity} 台` : '');
+          const toZenkaku = (n:number) => String(n).replace(/[0-9]/g, d => String.fromCharCode('０'.charCodeAt(0) + Number(d)));
+          const label = actives.length > 0
+            ? `レンタル${toZenkaku(rentSum)}台`
+            : (upcoming.length > 0 ? `レンタル${toZenkaku(upcoming[0].quantity)}台` : '');
           return (
           <div key={e.id} className="card" style={{ background: colors.bg, borderColor: colors.border }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

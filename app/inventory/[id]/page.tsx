@@ -13,6 +13,8 @@ export default function EquipmentDetail() {
   const [busy, setBusy] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [assign, setAssign] = useState<{ event_id: string; quantity: number }>({ event_id: "", quantity: 1 });
+  const [imageBusy, setImageBusy] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -74,6 +76,27 @@ export default function EquipmentDetail() {
   };
 
   if (!eq) return <div>読み込み中...</div>;
+  const images: string[] = Array.isArray((eq as any).properties?.images) ? ((eq as any).properties!.images as string[]) : [];
+  const addImage = async (file: File) => {
+    if (!file || !id) return;
+    setImageBusy(true);
+    const ext = file.name.split('.').pop();
+    const path = `${id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('equipment-images').upload(path, file, { upsert: false });
+    if (upErr) { alert(`アップロードに失敗しました: ${upErr.message}`); setImageBusy(false); return; }
+    const { data: pub } = supabase.storage.from('equipment-images').getPublicUrl(path);
+    const url = (pub as any)?.publicUrl as string;
+    const nextImages = [...images, url];
+    const nextProps = { ...((eq as any).properties || {}), images: nextImages };
+    const { error: upEq } = await supabase.from('equipments').update({ properties: nextProps } as any).eq('id', id);
+    if (upEq) { alert(upEq.message); }
+    else {
+      // refresh eq
+      const { data } = await supabase.from('equipments').select('*').eq('id', id).single();
+      setEq((data as Equipment) || eq);
+    }
+    setImageBusy(false);
+  };
 
   return (
     <div className="stack">
@@ -105,6 +128,31 @@ export default function EquipmentDetail() {
           <button className="btn primary" type="submit">追加</button>
         </form>
       </div>
+
+      <div className="card" style={{ maxWidth: 560 }}>
+        <div className="section-title">画像</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) addImage(f); e.currentTarget.value=''; }} />
+          {imageBusy && <span className="subtle">アップロード中...</span>}
+        </div>
+        {images.length === 0 ? (
+          <div className="subtle">画像はありません</div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {images.map((src, i) => (
+              <img key={i} src={src} alt="thumb" onClick={() => setPreview(src)}
+                   style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--border)' }} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {preview && (
+        <div onClick={() => setPreview(null)}
+             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'grid', placeItems: 'center', zIndex: 50 }}>
+          <img src={preview} alt="preview" style={{ maxWidth: '95vw', maxHeight: '90vh', borderRadius: 8 }} />
+        </div>
+      )}
     </div>
   );
 }
