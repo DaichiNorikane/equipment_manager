@@ -19,6 +19,7 @@ export default function EquipmentDetail() {
   const { admin } = useAdminMode();
   const [units, setUnits] = useState<EquipmentUnit[]>([]);
   const [unitBusy, setUnitBusy] = useState(false);
+  const [syncingUnits, setSyncingUnits] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -31,6 +32,36 @@ export default function EquipmentDetail() {
     };
     if (id) load();
   }, [id]);
+
+  // Ensure unit rows exist up to stock_count (auto-create missing rows)
+  useEffect(() => {
+    const sync = async () => {
+      if (!eq || syncingUnits) return;
+      const target = Number(eq.stock_count) || 0;
+      const current = units.length;
+      const need = target - current;
+      if (need > 0) {
+        setSyncingUnits(true);
+        const rows = Array.from({ length: need }).map(() => ({
+          equipment_id: id,
+          status: '正常',
+          serial: null,
+          note: null,
+          active: true
+        }));
+        const { error } = await supabase.from('equipment_units').insert(rows as any);
+        if (error) {
+          console.warn('unit sync insert failed:', error.message);
+        } else {
+          const { data: uts } = await supabase.from('equipment_units').select('*').eq('equipment_id', id).order('created_at');
+          setUnits((uts || []) as EquipmentUnit[]);
+        }
+        setSyncingUnits(false);
+      }
+    };
+    sync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eq?.stock_count, units.length]);
 
   const update = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,7 +247,9 @@ export default function EquipmentDetail() {
             for (const u of units) summary[u.status] = (summary[u.status] || 0) + (u.active ? 1 : 0);
             const keys = Object.keys(summary);
             if (keys.length === 0) return '未登録です。必要なら追加してください。';
-            return keys.map(k => `${k} ${summary[k]}台`).join(' ／ ');
+            const line = keys.map(k => `${k} ${summary[k]}台`).join(' ／ ');
+            const warn = (eq?.stock_count ?? 0) < units.length ? `（在籍台数が在庫数(${eq?.stock_count})を上回っています）` : '';
+            return line + (warn ? ' ' + warn : '');
           })()}
         </div>
         <details>
