@@ -247,9 +247,11 @@ function CategoriesAdmin({ categories, onChanged }: { categories: Category[]; on
     const arr = categories.slice();
     const [moved] = arr.splice(from, 1);
     arr.splice(to, 0, moved);
-    const updates = arr.map((c, i) => ({ id: c.id, sort_order: i * 10 }));
-    const { error } = await supabase.from('categories').upsert(updates as any, { onConflict: 'id' } as any);
-    if (error) { alert(error.message); return; }
+    // upsert では INSERT 経路になり name NOT NULL エラーが出るケースがあるため、安全に1件ずつ UPDATE
+    for (let i = 0; i < arr.length; i++) {
+      const { error } = await supabase.from('categories').update({ sort_order: i * 10 } as any).eq('id', arr[i].id);
+      if (error) { alert(error.message); return; }
+    }
     await onChanged();
   };
   return (
