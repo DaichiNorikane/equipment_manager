@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import type { Equipment, Event } from "@/lib/types";
+import type { Equipment, Event, EquipmentUnit } from "@/lib/types";
 import { useAdminMode } from "@/lib/useAdminMode";
 
 export default function EquipmentDetail() {
@@ -17,6 +17,8 @@ export default function EquipmentDetail() {
   const [imageBusy, setImageBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const { admin } = useAdminMode();
+  const [units, setUnits] = useState<EquipmentUnit[]>([]);
+  const [unitBusy, setUnitBusy] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -24,6 +26,8 @@ export default function EquipmentDetail() {
       setEq((data as Equipment) || null);
       const { data: evs } = await supabase.from('events').select('*').order('start_at', { ascending: true });
       setEvents((evs || []) as Event[]);
+      const { data: uts } = await supabase.from('equipment_units').select('*').eq('equipment_id', id).order('created_at');
+      setUnits((uts || []) as EquipmentUnit[]);
     };
     if (id) load();
   }, [id]);
@@ -99,6 +103,30 @@ export default function EquipmentDetail() {
     }
     setImageBusy(false);
   };
+
+  // Units CRUD
+  const addUnit = async () => {
+    setUnitBusy(true);
+    const { data, error } = await supabase.from('equipment_units').insert({ equipment_id: id, status: '正常', serial: null, note: null, active: true } as any).select('*').single();
+    if (error) alert(error.message);
+    else setUnits(prev => [...prev, data as any as EquipmentUnit]);
+    setUnitBusy(false);
+  };
+  const updateUnit = async (uid: string, patch: Partial<EquipmentUnit>) => {
+    setUnits(prev => prev.map(u => u.id === uid ? { ...u, ...patch } : u));
+  };
+  const saveUnit = async (u: EquipmentUnit) => {
+    const payload = { serial: u.serial || null, status: u.status, note: u.note || null, active: u.active } as any;
+    const { error } = await supabase.from('equipment_units').update(payload).eq('id', u.id);
+    if (error) alert(error.message);
+  };
+  const deleteUnitRow = async (uid: string) => {
+    if (!confirm('このユニットを削除しますか？')) return;
+    const { error } = await supabase.from('equipment_units').delete().eq('id', uid);
+    if (error) alert(error.message);
+    else setUnits(prev => prev.filter(x => x.id !== uid));
+  };
+  const statuses = ['正常','故障','点検中','予備','廃棄'];
 
   const pathFromUrl = (u: string) => {
     const re = /\/object\/public\/equipment-images\/(.+)$/;
@@ -178,6 +206,42 @@ export default function EquipmentDetail() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="card" style={{ maxWidth: 560 }}>
+        <div className="section-title">台数詳細（簡易）</div>
+        <div className="subtle" style={{ marginBottom: 8 }}>
+          {(() => {
+            const summary: Record<string, number> = {};
+            for (const u of units) summary[u.status] = (summary[u.status] || 0) + (u.active ? 1 : 0);
+            const keys = Object.keys(summary);
+            if (keys.length === 0) return '未登録です。必要なら追加してください。';
+            return keys.map(k => `${k} ${summary[k]}台`).join(' ／ ');
+          })()}
+        </div>
+        <details>
+          <summary>編集する</summary>
+          <div className="list" style={{ marginTop: 8 }}>
+            {units.map(u => (
+              <div key={u.id} className="row" style={{ gridTemplateColumns: '1fr 1fr 1fr auto', alignItems: 'center' }}>
+                <input placeholder="シリアル" value={u.serial || ''} onChange={e => updateUnit(u.id, { serial: e.target.value })} onBlur={() => saveUnit(units.find(x => x.id === u.id)!)} />
+                <select value={u.status} onChange={e => { const v = e.target.value; updateUnit(u.id, { status: v }); saveUnit({ ...u, status: v } as any); }}>
+                  {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input placeholder="状態メモ" value={u.note || ''} onChange={e => updateUnit(u.id, { note: e.target.value })} onBlur={() => saveUnit(units.find(x => x.id === u.id)!)} />
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <label className="subtle" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <input type="checkbox" checked={u.active} onChange={e => { updateUnit(u.id, { active: e.target.checked }); saveUnit({ ...u, active: e.target.checked } as any); }} /> 在籍
+                  </label>
+                  <button className="btn danger" onClick={() => deleteUnitRow(u.id)}>削除</button>
+                </div>
+              </div>
+            ))}
+            <div>
+              <button className="btn" disabled={unitBusy} onClick={addUnit}>行を追加</button>
+            </div>
+          </div>
+        </details>
       </div>
 
       {preview && (

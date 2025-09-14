@@ -56,3 +56,14 @@ export type Rental = {
   arranged?: boolean;
   created_at: string;
 };
+
+export type EquipmentUnit = {
+  id: string;
+  equipment_id: string;
+  serial: string | null;
+  status: string; // '正常' | '故障' | '点検中' | '予備' | '廃棄'
+  note: string | null;
+  active: boolean; // 在籍中（在庫として数える）
+  created_at: string;
+  updated_at: string;
+};
