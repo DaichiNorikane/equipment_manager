@@ -35,7 +35,7 @@ export default function EventsPage() {
   useEffect(() => {
     const init = async () => {
       await reload();
-      const { data: cats } = await supabase.from("categories").select("*").order("name");
+      const { data: cats } = await supabase.from("categories").select("*").order('sort_order', { ascending: true }).order("name");
       setCategories((cats || []) as Category[]);
       const { data: eqs } = await supabase.from("equipments").select("*").order("manufacturer").order("model");
       setEquipments((eqs || []) as Equipment[]);

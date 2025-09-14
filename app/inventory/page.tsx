@@ -12,7 +12,7 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [filterCat, setFilterCat] = useState<string>("");
   const [filterMaker, setFilterMaker] = useState<string>("");
-  const [sortMode, setSortMode] = useState<"default" | "category" | "manufacturer">("default");
+  const [sortMode, setSortMode] = useState<"default" | "category" | "manufacturer">("category");
   const { admin } = useAdminMode();
   const pastel = (key: string) => {
     if (!key) return { bg: '#fff', border: '#e5e7eb' };
@@ -51,7 +51,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: cats } = await supabase.from("categories").select("*").order("name");
+      const { data: cats } = await supabase.from("categories").select("*").order('sort_order', { ascending: true }).order("name");
       setCategories((cats || []) as Category[]);
       await reload();
     };
@@ -65,6 +65,21 @@ export default function InventoryPage() {
     };
     loadRentals();
   }, []);
+
+  // Persist filters & sort in localStorage
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('invPrefs') || '{}');
+      if (saved.filterCat) setFilterCat(saved.filterCat);
+      if (saved.filterMaker) setFilterMaker(saved.filterMaker);
+      if (saved.sortMode) setSortMode(saved.sortMode);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('invPrefs', JSON.stringify({ filterCat, filterMaker, sortMode }));
+    } catch {}
+  }, [filterCat, filterMaker, sortMode]);
 
   const addEquipment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,7 +197,7 @@ export default function InventoryPage() {
       {admin && (
         <>
           <CategoriesAdmin categories={categories} onChanged={async () => {
-            const { data: cats } = await supabase.from('categories').select('*').order('name');
+            const { data: cats } = await supabase.from('categories').select('*').order('sort_order', { ascending: true }).order('name');
             setCategories((cats || []) as Category[]);
           }} />
           <ManufacturersAdmin equipments={equipments} onChanged={reload} />
@@ -227,16 +242,25 @@ function ManufacturersAdmin({ equipments, onChanged }: { equipments: Equipment[]
 
 function CategoriesAdmin({ categories, onChanged }: { categories: Category[]; onChanged: () => void }) {
   const [editing, setEditing] = useState<Record<string, string>>({});
+  const reorder = async (from: number, to: number) => {
+    if (to < 0 || to >= categories.length) return;
+    const arr = categories.slice();
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    const updates = arr.map((c, i) => ({ id: c.id, sort_order: i * 10 }));
+    const { error } = await supabase.from('categories').upsert(updates as any, { onConflict: 'id' } as any);
+    if (error) { alert(error.message); return; }
+    await onChanged();
+  };
   return (
     <div className="card" style={{ marginTop: 12 }}>
-      <div className="section-title">カテゴリ管理（編集・削除・管理者）</div>
+      <div className="section-title">カテゴリ管理（並べ替え・編集・削除・管理者）</div>
       <div className="list">
-        {categories.map(c => (
-          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
-            <input
-              value={editing[c.id] ?? c.name}
-              onChange={e => setEditing(prev => ({ ...prev, [c.id]: e.target.value }))}
-            />
+        {categories.map((c, idx) => (
+          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', gap: 8, alignItems: 'center' }}>
+            <input value={editing[c.id] ?? c.name} onChange={e => setEditing(prev => ({ ...prev, [c.id]: e.target.value }))} />
+            <button className="btn" onClick={() => reorder(idx, idx - 1)}>▲</button>
+            <button className="btn" onClick={() => reorder(idx, idx + 1)}>▼</button>
             <button className="btn" onClick={async () => {
               const name = (editing[c.id] ?? c.name).trim();
               if (!name) { alert('名前を入力してください'); return; }

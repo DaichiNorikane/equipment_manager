@@ -22,7 +22,7 @@ export default function InventoryAddPage() {
   useEffect(() => {
     const init = async () => {
       const [{ data: cats }, { data: eqs }] = await Promise.all([
-        supabase.from("categories").select("*").order("name"),
+        supabase.from("categories").select("*").order('sort_order', { ascending: true }).order("name"),
         supabase.from("equipments").select("*").order("manufacturer").order("model")
       ]);
       setCategories((cats || []) as Category[]);

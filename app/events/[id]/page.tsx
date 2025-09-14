@@ -38,7 +38,7 @@ export default function EventDetailPage() {
 
       // Load categories and equipments for selection
       const [{ data: cats }, { data: eqs }] = await Promise.all([
-        supabase.from("categories").select("*").order("name"),
+        supabase.from("categories").select("*").order('sort_order', { ascending: true }).order("name"),
         supabase.from("equipments").select("*").order("manufacturer").order("model")
       ]);
       const eqList = (eqs || []) as Equipment[];
