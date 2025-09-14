@@ -34,15 +34,22 @@ export default function InventoryPage() {
 
   const makers = useMemo(() => Array.from(new Set(equipments.map(e => e.manufacturer))).sort(), [equipments]);
   const filtered = useMemo(() => {
+    const orderMap = new Map<string, number>();
+    categories.forEach((c, idx) => orderMap.set(c.id, typeof c.sort_order === 'number' ? c.sort_order : idx * 10));
     return equipments.filter(e =>
       (filterCat ? e.category_id === filterCat : true) &&
       (filterMaker ? e.manufacturer === filterMaker : true)
     ).sort((a, b) => {
-      if (sortMode === 'category') return (a.category_id || '').localeCompare(b.category_id || '') || a.manufacturer.localeCompare(b.manufacturer) || a.model.localeCompare(b.model);
+      if (sortMode === 'category') {
+        const oa = orderMap.get(a.category_id || '') ?? 999999;
+        const ob = orderMap.get(b.category_id || '') ?? 999999;
+        if (oa !== ob) return oa - ob;
+        return (a.manufacturer.localeCompare(b.manufacturer)) || a.model.localeCompare(b.model);
+      }
       if (sortMode === 'manufacturer') return a.manufacturer.localeCompare(b.manufacturer) || a.model.localeCompare(b.model);
       return 0;
     });
-  }, [equipments, filterCat, filterMaker, sortMode]);
+  }, [equipments, filterCat, filterMaker, sortMode, categories]);
 
   const reload = async () => {
     const { data: eqs } = await supabase.from("equipments").select("*").order("manufacturer").order("model");
