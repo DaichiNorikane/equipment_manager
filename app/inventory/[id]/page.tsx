@@ -20,6 +20,7 @@ export default function EquipmentDetail() {
   const [units, setUnits] = useState<EquipmentUnit[]>([]);
   const [unitBusy, setUnitBusy] = useState(false);
   const [syncingUnits, setSyncingUnits] = useState(false);
+  const [unitsLoaded, setUnitsLoaded] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -29,6 +30,7 @@ export default function EquipmentDetail() {
       setEvents((evs || []) as Event[]);
       const { data: uts } = await supabase.from('equipment_units').select('*').eq('equipment_id', id).order('created_at');
       setUnits((uts || []) as EquipmentUnit[]);
+      setUnitsLoaded(true);
     };
     if (id) load();
   }, [id]);
@@ -36,7 +38,7 @@ export default function EquipmentDetail() {
   // Ensure unit rows exist up to stock_count (auto-create missing rows)
   useEffect(() => {
     const sync = async () => {
-      if (!eq || syncingUnits) return;
+      if (!eq || syncingUnits || !unitsLoaded) return;
       const target = Number(eq.stock_count) || 0;
       const current = units.length;
       const need = target - current;
@@ -57,11 +59,25 @@ export default function EquipmentDetail() {
           setUnits((uts || []) as EquipmentUnit[]);
         }
         setSyncingUnits(false);
+      } else if (need < 0) {
+        // 多い分は削除（優先: active=false を優先削除→作成が新しい順）
+        setSyncingUnits(true);
+        const extra = -need;
+        const inactiveFirst = [...units].sort((a,b) => Number(a.active) - Number(b.active) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const ids = inactiveFirst.slice(0, extra).map(u => u.id);
+        const { error } = await supabase.from('equipment_units').delete().in('id', ids);
+        if (error) {
+          console.warn('unit sync delete failed:', error.message);
+        } else {
+          const { data: uts } = await supabase.from('equipment_units').select('*').eq('equipment_id', id).order('created_at');
+          setUnits((uts || []) as EquipmentUnit[]);
+        }
+        setSyncingUnits(false);
       }
     };
     sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eq?.stock_count, units.length]);
+  }, [eq?.stock_count, units.length, unitsLoaded]);
 
   const update = async (e: React.FormEvent) => {
     e.preventDefault();
