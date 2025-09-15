@@ -15,6 +15,9 @@ type Shortage = {
 export default function Dashboard() {
   const [shortages, setShortages] = useState<Shortage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recent, setRecent] = useState<{ type: string; label: string; at: string; href: string }[]>([]);
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<{ label: string; href: string }[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -148,6 +151,16 @@ export default function Dashboard() {
       }
 
       setShortages(result);
+      // Recent updates (top 10)
+      const rec: { type: string; label: string; at: string; href: string }[] = [];
+      const { data: ev10 } = await supabase.from('events').select('*').order('updated_at', { ascending: false }).limit(10);
+      (ev10 || []).forEach((e: any) => rec.push({ type: 'イベント', label: e.name, at: e.updated_at, href: `/events/${e.id}` }));
+      const { data: eq10 } = await supabase.from('equipments').select('*').order('updated_at', { ascending: false }).limit(10);
+      (eq10 || []).forEach((e: any) => rec.push({ type: '機材', label: `${e.manufacturer} ${e.model}`, at: e.updated_at, href: `/inventory/${e.id}` }));
+      const { data: rt10 } = await supabase.from('rentals').select('*').order('created_at', { ascending: false }).limit(10);
+      (rt10 || []).forEach((r: any) => rec.push({ type: 'レンタル', label: `${r.company}`, at: r.created_at, href: `/rentals` }));
+      rec.sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+      setRecent(rec.slice(0,10));
       setLoading(false);
     };
 
@@ -157,7 +170,42 @@ export default function Dashboard() {
   return (
     <div className="stack">
       <h2 className="page-title">ダッシュボード</h2>
+      <div className="card" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input placeholder="検索（機材/イベント/レンタル会社）" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 380 }} />
+        <button className="btn" onClick={async () => {
+          const list: { label: string; href: string }[] = [];
+          if (q.trim()) {
+            const { data: evs } = await supabase.from('events').select('*').ilike('name', `%${q}%`).limit(10);
+            (evs || []).forEach((e: any) => list.push({ label: `イベント: ${e.name}`, href: `/events/${e.id}` }));
+            const { data: eqs } = await supabase.from('equipments').select('*').or(`manufacturer.ilike.%${q}%,model.ilike.%${q}%`).limit(10);
+            (eqs || []).forEach((e: any) => list.push({ label: `機材: ${e.manufacturer} ${e.model}`, href: `/inventory/${e.id}` }));
+            const { data: rts } = await supabase.from('rentals').select('*').ilike('company', `%${q}%`).limit(10);
+            (rts || []).forEach((r: any) => list.push({ label: `レンタル: ${r.company}`, href: `/rentals` }));
+          }
+          setHits(list);
+        }}>検索</button>
+      </div>
+      {hits.length > 0 && (
+        <div className="card">
+          <div className="section-title">検索結果</div>
+          <div className="list">
+            {hits.map((h,i) => (
+              <a key={i} href={h.href}>{h.label}</a>
+            ))}
+          </div>
+        </div>
+      )}
       <p className="subtle">全期間のイベントで、期間が重なることにより不足する区間と台数を表示します。レンタル分が不足を相殺する場合は「不足0（内レンタルn台）」と表示します。</p>
+      {recent.length > 0 && (
+        <div className="card">
+          <div className="section-title">最新の更新</div>
+          <div className="list">
+            {recent.map((r,i) => (
+              <a key={i} href={r.href}>{new Date(r.at).toLocaleString()} - {r.type}: {r.label}</a>
+            ))}
+          </div>
+        </div>
+      )}
       {loading && <div className="card">読み込み中...</div>}
       {!loading && shortages.length === 0 && <div className="card">不足はありません。</div>}
       {!loading && shortages.length > 0 && (

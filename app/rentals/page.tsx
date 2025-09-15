@@ -123,10 +123,21 @@ export default function RentalsPage() {
             <label><input type="radio" checked={mode==='new'} onChange={() => setMode('new')} /> 在庫にない機材をレンタル</label>
           </div>
           {mode === 'existing' ? (
-            <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} required>
-              <option value="">(機材を選択)</option>
-              {equipments.map(eq => <option key={eq.id} value={eq.id}>{eq.manufacturer} {eq.model}{eq.is_rental_only ? '（レンタル）' : ''}</option>)}
-            </select>
+            <>
+              <label>
+                カテゴリ
+                <select value={(form as any).category_id || ''} onChange={e => setForm({ ...(form as any), category_id: e.target.value, equipment_id: '' }) as any}>
+                  <option value="">(すべて)</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+              <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} required>
+                <option value="">(機材を選択)</option>
+                {equipments
+                  .filter(eq => !(form as any).category_id || eq.category_id === (form as any).category_id)
+                  .map(eq => <option key={eq.id} value={eq.id}>{eq.manufacturer} {eq.model}{(eq as any).is_rental_only ? '（レンタル）' : ''}</option>)}
+              </select>
+            </>
           ) : (
             <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <label>
@@ -160,7 +171,7 @@ export default function RentalsPage() {
 
       <div className="list">
         {rentals.map(r => (
-          <RentalCard key={r.id} rental={r} eqLabel={eqName(r.equipment_id)} canEdit={admin} onChanged={reload} />
+          <RentalCard key={r.id} rental={r} eqLabel={eqName(r.equipment_id)} canEdit={true} onChanged={reload} />
         ))}
       </div>
     </div>

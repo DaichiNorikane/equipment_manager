@@ -83,8 +83,13 @@ label { display: block; font-size: 13px; color: var(--muted); }
   .toolbar { gap: 10px; }
   .row { grid-template-columns: 1fr 110px 80px; }
   .row.wide { grid-template-columns: 1fr 1fr 110px 80px; }
-  .event-row { grid-template-columns: 1fr; }
-  .event-row .delete-btn { justify-self: end; }
+  /* 1行で詰めて多く見せる */
+  .event-row { grid-template-columns: minmax(120px,1fr) 1fr 60px 90px 56px; }
+  .event-row input[type="text"], .event-row input:not([type]), .event-row textarea {
+    max-width: 90px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .event-row .delete-btn { justify-self: end; padding: 4px 8px; }
 }
 
 .section-title { font-weight: 700; margin: 8px 0; }

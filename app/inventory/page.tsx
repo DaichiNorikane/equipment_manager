@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { Category, Equipment, Rental } from "@/lib/types";
+import type { Category, Equipment, Rental, EquipmentUnit } from "@/lib/types";
 import Link from "next/link";
 import AdminPanel from "@/components/AdminPanel";
 import { useAdminMode } from "@/lib/useAdminMode";
@@ -65,12 +65,25 @@ export default function InventoryPage() {
     init();
   }, []);
   const [rentals, setRentals] = useState<Rental[]>([]);
+  const [unitMap, setUnitMap] = useState<Record<string, EquipmentUnit[]>>({});
   useEffect(() => {
     const loadRentals = async () => {
       const { data: rts } = await supabase.from('rentals').select('*');
       setRentals((rts || []) as Rental[]);
     };
     loadRentals();
+  }, []);
+  useEffect(() => {
+    const loadUnits = async () => {
+      const { data: uts } = await supabase.from('equipment_units').select('*');
+      const map: Record<string, EquipmentUnit[]> = {};
+      (uts || []).forEach((u: any) => {
+        const key = u.equipment_id as string;
+        (map[key] ||= []).push(u as EquipmentUnit);
+      });
+      setUnitMap(map);
+    };
+    loadUnits();
   }, []);
 
   // Persist filters & sort in localStorage
@@ -168,34 +181,35 @@ export default function InventoryPage() {
           const label = actives.length > 0
             ? `レンタル${toZenkaku(rentSum)}台`
             : (upcoming.length > 0 ? `レンタル${toZenkaku(upcoming[0].quantity)}台` : '');
+          const units = unitMap[e.id] || [];
+          const activeUnits = units.filter(u => u.active);
+          const broken = activeUnits.filter(u => u.status === '故障').length;
+          const inspect = activeUnits.filter(u => u.status === '点検中').length;
+          const other = activeUnits.filter(u => u.status !== '正常' && u.status !== '故障' && u.status !== '点検中').length;
+          const effectiveStock = Math.max(0, e.stock_count - broken);
           return (
           <div key={e.id} className="card" style={{ background: colors.bg, borderColor: colors.border }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px,1fr) repeat(3,auto)', gap: 8, alignItems: 'center' }}>
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <b>{e.manufacturer}</b> <Link href={`/inventory/${e.id}`}>{e.model}</Link>
                 {(((e as any).is_rental_only === true) || (((e as any).properties || {})['rental_only'] === true)) ? <span className="tag" style={{ marginLeft: 8 }}>レンタル</span> : null}
                 {cat && <span className="tag" style={{ marginLeft: 8 }}>{cat.name}</span>}
               </div>
+              <div className="subtle">在庫 <b>{effectiveStock}</b>{broken>0 && <span>（故障 {broken}）</span>}{inspect>0 && <span>（点検 {inspect}）</span>}{other>0 && <span>（他 {other}）</span>}</div>
+              <div className="subtle">{(actives.length > 0 || upcoming.length > 0) ? (<>
+                <Link href="/rentals">{label}</Link>{start && end && (<span>（{start.toLocaleDateString()} - {end.toLocaleDateString()}）</span>)}
+              </>) : <span style={{opacity:.6}}>レンタルなし</span>}</div>
               {admin && (
-                <button className="btn danger" onClick={async () => {
-                  if (!confirm(`${e.manufacturer} ${e.model} を削除しますか？（関連するイベント割当は削除されます）`)) return;
-                  const { error: e1 } = await supabase.from('event_usages').delete().eq('equipment_id', e.id);
-                  if (e1) { alert(e1.message); return; }
-                  const { error: e2 } = await supabase.from('equipments').delete().eq('id', e.id);
-                  if (e2) { alert(e2.message); return; }
-                  await reload();
-                }}>削除</button>
-              )}
-            </div>
-            <div className="subtle">
-              在庫: {e.stock_count}
-              {(actives.length > 0 || upcoming.length > 0) && (
-                <span style={{ marginLeft: 8 }}>
-                  | <Link href="/rentals">{label}</Link>
-                  {start && end && (
-                    <span>（{start.toLocaleDateString()} - {end.toLocaleDateString()}）</span>
-                  )}
-                </span>
+                <div style={{ justifySelf: 'end' }}>
+                  <button className="btn danger" onClick={async () => {
+                    if (!confirm(`${e.manufacturer} ${e.model} を削除しますか？（関連するイベント割当は削除されます）`)) return;
+                    const { error: e1 } = await supabase.from('event_usages').delete().eq('equipment_id', e.id);
+                    if (e1) { alert(e1.message); return; }
+                    const { error: e2 } = await supabase.from('equipments').delete().eq('id', e.id);
+                    if (e2) { alert(e2.message); return; }
+                    await reload();
+                  }}>削除</button>
+                </div>
               )}
             </div>
           </div>
