@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { Category, Equipment, Rental, EquipmentUnit } from "@/lib/types";
 import Link from "next/link";
@@ -8,7 +8,7 @@ import AdminPanel from "@/components/AdminPanel";
 import { useAdminMode } from "@/lib/useAdminMode";
 import { useSearchParams } from "next/navigation";
 
-export default function InventoryPage() {
+function InventoryContent() {
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const searchParams = useSearchParams();
@@ -257,6 +257,14 @@ export default function InventoryPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense fallback={<div className="card">検索条件を読み込み中...</div>}>
+      <InventoryContent />
+    </Suspense>
   );
 }
 
