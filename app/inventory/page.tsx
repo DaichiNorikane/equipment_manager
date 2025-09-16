@@ -209,8 +209,11 @@ function InventoryContent() {
           return (
           <div key={e.id} className="card" style={{ background: colors.bg, borderColor: colors.border }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px,1fr) repeat(3,auto)', gap: 8, alignItems: 'center' }}>
-              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <b>{e.manufacturer}</b> <Link href={`/inventory/${e.id}`}>{e.model}</Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <b>{e.manufacturer}</b>{' '}
+                  <Link href={`/inventory/${e.id}`} style={{ textDecoration: 'underline' }}>{e.model}</Link>
+                </div>
                 {e.url && (
                   <a
                     href={e.url}
@@ -218,13 +221,13 @@ function InventoryContent() {
                     rel="noopener noreferrer"
                     title="機材URLを開く"
                     aria-label="機材URLを開く"
-                    style={{ marginLeft: 6, textDecoration: 'none', opacity: 0.85 }}
-                    onClick={e => e.stopPropagation()}
+                    style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 14, background: 'rgba(0,0,0,0.08)' }}
+                    onClick={event => event.stopPropagation()}
                   >
                     🔗
                   </a>
                 )}
-                {(((e as any).is_rental_only === true) || (((e as any).properties || {})['rental_only'] === true)) ? <span className="tag" style={{ marginLeft: 8 }}>レンタル</span> : null}
+              {(((e as any).is_rental_only === true) || (((e as any).properties || {})['rental_only'] === true)) ? <span className="tag" style={{ marginLeft: 8 }}>レンタル</span> : null}
                 {cat && <span className="tag" style={{ marginLeft: 8 }}>{cat.name}</span>}
               </div>
               <div className="subtle">在庫 <b>{effectiveStock}</b>{broken>0 && <span>（故障 {broken}）</span>}{inspect>0 && <span>（点検 {inspect}）</span>}{other>0 && <span>（他 {other}）</span>}</div>
