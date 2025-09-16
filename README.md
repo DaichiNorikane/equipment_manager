@@ -20,6 +20,15 @@
    - `supabase/sql/001_schema.sql`
    - `supabase/sql/002_policies.sql`
    - `supabase/sql/003_functions.sql`
+   - `supabase/sql/004_migrate_equipments_without_name.sql`
+   - `supabase/sql/005_rentals.sql`
+   - `supabase/sql/006_add_is_rental_only.sql`
+   - `supabase/sql/007_rentals_arranged.sql`
+   - `supabase/sql/008_units.sql`
+   - `supabase/sql/009_categories_sort.sql`
+   - `supabase/sql/010_update_propagation.sql`
+   - 最後に `supabase/sql/999_status_check.sql` を実行し、すべて OK を確認
+   - 必要なら REST スキーマをリロード：`select pg_notify('pgrst','reload schema');`
 3) `.env.local` を作成し、以下を設定：
 ```
 NEXT_PUBLIC_SUPABASE_URL=あなたのSupabaseURL

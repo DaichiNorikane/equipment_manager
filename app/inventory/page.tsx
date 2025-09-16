@@ -192,6 +192,19 @@ export default function InventoryPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px,1fr) repeat(3,auto)', gap: 8, alignItems: 'center' }}>
               <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <b>{e.manufacturer}</b> <Link href={`/inventory/${e.id}`}>{e.model}</Link>
+                {e.url && (
+                  <a
+                    href={e.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="機材URLを開く"
+                    aria-label="機材URLを開く"
+                    style={{ marginLeft: 6, textDecoration: 'none', opacity: 0.85 }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    🔗
+                  </a>
+                )}
                 {(((e as any).is_rental_only === true) || (((e as any).properties || {})['rental_only'] === true)) ? <span className="tag" style={{ marginLeft: 8 }}>レンタル</span> : null}
                 {cat && <span className="tag" style={{ marginLeft: 8 }}>{cat.name}</span>}
               </div>

@@ -171,15 +171,43 @@ export default function Dashboard() {
     <div className="stack">
       <h2 className="page-title">ダッシュボード</h2>
       <div className="card" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input placeholder="検索（機材/イベント/レンタル会社）" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 380 }} />
+        <input placeholder="検索（機材/イベント/レンタル など）" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 380 }} />
         <button className="btn" onClick={async () => {
           const list: { label: string; href: string }[] = [];
           if (q.trim()) {
-            const { data: evs } = await supabase.from('events').select('*').ilike('name', `%${q}%`).limit(10);
+            const esc = (s: string) => s.replaceAll(/[,()]/g, (m) => `\\${m}`);
+            const qq = esc(q);
+            // Events: name, location, notes
+            const { data: evs } = await supabase
+              .from('events')
+              .select('*')
+              .or(`name.ilike.%${qq}%,location.ilike.%${qq}%,notes.ilike.%${qq}%`)
+              .limit(10);
             (evs || []).forEach((e: any) => list.push({ label: `イベント: ${e.name}`, href: `/events/${e.id}` }));
-            const { data: eqs } = await supabase.from('equipments').select('*').or(`manufacturer.ilike.%${q}%,model.ilike.%${q}%`).limit(10);
+
+            // Equipments: manufacturer, model, notes, url, power, weight, dimensions, origin
+            const { data: eqs } = await supabase
+              .from('equipments')
+              .select('*')
+              .or([
+                `manufacturer.ilike.%${qq}%`,
+                `model.ilike.%${qq}%`,
+                `notes.ilike.%${qq}%`,
+                `url.ilike.%${qq}%`,
+                `power_consumption.ilike.%${qq}%`,
+                `weight.ilike.%${qq}%`,
+                `dimensions.ilike.%${qq}%`,
+                `origin_country.ilike.%${qq}%`
+              ].join(','))
+              .limit(10);
             (eqs || []).forEach((e: any) => list.push({ label: `機材: ${e.manufacturer} ${e.model}`, href: `/inventory/${e.id}` }));
-            const { data: rts } = await supabase.from('rentals').select('*').ilike('company', `%${q}%`).limit(10);
+
+            // Rentals: company, places, notes
+            const { data: rts } = await supabase
+              .from('rentals')
+              .select('*')
+              .or(`company.ilike.%${qq}%,arrive_place.ilike.%${qq}%,return_place.ilike.%${qq}%,notes.ilike.%${qq}%`)
+              .limit(10);
             (rts || []).forEach((r: any) => list.push({ label: `レンタル: ${r.company}`, href: `/rentals` }));
           }
           setHits(list);
