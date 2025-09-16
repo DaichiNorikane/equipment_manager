@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [recent, setRecent] = useState<{ type: string; label: string; detail?: string; at: string; href: string; icon: string }[]>([]);
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<{ type: "category" | "equipment" | "event" | "rental"; label: string; href: string }[]>([]);
+  const [hits, setHits] = useState<{ type: "category" | "equipment" | "event" | "rental"; label: string; href: string; detail?: string }[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<number | null>(null);
   const seqRef = useRef(0);
@@ -74,12 +74,17 @@ export default function Dashboard() {
 
       if (seqRef.current !== runId) return; // stale response
 
-      const results: { type: "category" | "equipment" | "event" | "rental"; label: string; href: string }[] = [];
+      const results: { type: "category" | "equipment" | "event" | "rental"; label: string; href: string; detail?: string }[] = [];
       (catsRes.data as Category[] | null)?.forEach(c => {
         results.push({ type: 'category', label: c.name, href: `/inventory?category=${c.id}` });
       });
       (eqsRes.data as Equipment[] | null)?.forEach(e => {
-        results.push({ type: 'equipment', label: `${e.manufacturer} ${e.model}`, href: `/inventory/${e.id}` });
+        results.push({
+          type: 'equipment',
+          label: `メーカー: ${e.manufacturer} / 型番: ${e.model}`,
+          detail: `在庫数: ${e.stock_count}`,
+          href: `/inventory/${e.id}`
+        });
       });
       (evsRes.data as Event[] | null)?.forEach(e => {
         results.push({ type: 'event', label: e.name, href: `/events/${e.id}` });
@@ -312,10 +317,10 @@ export default function Dashboard() {
   }, [q, doSearch]);
 
   const groupedHits = useMemo(() => {
-    const map = new Map<string, { label: string; href: string }[]>();
+    const map = new Map<string, { label: string; href: string; detail?: string }[]>();
     for (const h of hits) {
       const arr = map.get(h.type) || [];
-      arr.push({ label: h.label, href: h.href });
+      arr.push({ label: h.label, href: h.href, detail: h.detail });
       map.set(h.type, arr);
     }
     return map;
@@ -363,9 +368,12 @@ export default function Dashboard() {
                 <div className="subtle" style={{ marginBottom: 4 }}>{meta.icon} {meta.title}</div>
                 <div className="list">
                   {items.map((h, i) => (
-                    <a key={`${meta.type}-${i}`} href={h.href} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <a key={`${meta.type}-${i}`} href={h.href} style={{ display: 'flex', gap: 8 }}>
                       <span>{meta.icon}</span>
-                      <span>{h.label}</span>
+                      <span>
+                        <span>{h.label}</span>
+                        {h.detail && <div className="subtle">{h.detail}</div>}
+                      </span>
                     </a>
                   ))}
                 </div>
