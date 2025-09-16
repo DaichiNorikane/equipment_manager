@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { Category, Equipment, Rental, EquipmentUnit } from "@/lib/types";
 import Link from "next/link";
 import AdminPanel from "@/components/AdminPanel";
 import { useAdminMode } from "@/lib/useAdminMode";
+import { useSearchParams } from "next/navigation";
 
 export default function InventoryPage() {
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams?.get('category') || "";
   const [filterCat, setFilterCat] = useState<string>("");
   const [filterMaker, setFilterMaker] = useState<string>("");
   const [sortMode, setSortMode] = useState<"default" | "category" | "manufacturer">("category");
@@ -87,15 +90,31 @@ export default function InventoryPage() {
   }, []);
 
   // Persist filters & sort in localStorage
+  const prefsLoaded = useRef(false);
+  const skipPersistOnce = useRef(true);
   useEffect(() => {
+    if (prefsLoaded.current) {
+      const next = categoryParam || "";
+      setFilterCat(prev => (prev === next ? prev : next));
+      return;
+    }
     try {
       const saved = JSON.parse(localStorage.getItem('invPrefs') || '{}');
-      if (saved.filterCat) setFilterCat(saved.filterCat);
+      if (categoryParam) {
+        setFilterCat(categoryParam);
+      } else if (saved.filterCat) {
+        setFilterCat(saved.filterCat);
+      }
       if (saved.filterMaker) setFilterMaker(saved.filterMaker);
       if (saved.sortMode) setSortMode(saved.sortMode);
     } catch {}
-  }, []);
+    prefsLoaded.current = true;
+  }, [categoryParam]);
   useEffect(() => {
+    if (skipPersistOnce.current) {
+      skipPersistOnce.current = false;
+      return;
+    }
     try {
       localStorage.setItem('invPrefs', JSON.stringify({ filterCat, filterMaker, sortMode }));
     } catch {}

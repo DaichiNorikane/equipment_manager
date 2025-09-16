@@ -202,7 +202,22 @@ export default function EquipmentDetail() {
 
   return (
     <div className="stack">
-      <h2 className="page-title">機材詳細</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 className="page-title" style={{ marginBottom: 0 }}>機材詳細</h2>
+        {eq.url && (
+          <a
+            href={eq.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pill"
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            title="機材URLを開く"
+            aria-label="機材URLを開く"
+          >
+            🔗<span>URL</span>
+          </a>
+        )}
+      </div>
       <form onSubmit={update} className="form-grid" style={{ maxWidth: 560 }}>
         <input placeholder="メーカー(必須)" value={eq.manufacturer} onChange={e => setEq({ ...eq, manufacturer: e.target.value })} required />
         <input placeholder="型番(必須)" value={eq.model} onChange={e => setEq({ ...eq, model: e.target.value })} required />

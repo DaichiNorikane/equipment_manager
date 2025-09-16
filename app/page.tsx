@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
-import type { Event, EventUsage, Equipment, Rental } from "@/lib/types";
+import type { Category, Event, EventUsage, Equipment, Rental } from "@/lib/types";
 
 type ShortageInterval = { start_at: string; end_at: string; shortage: number; rental_used: number; arranged_ok: boolean };
 type Shortage = {
@@ -17,7 +17,81 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [recent, setRecent] = useState<{ type: string; label: string; at: string; href: string }[]>([]);
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<{ label: string; href: string }[]>([]);
+  const [hits, setHits] = useState<{ type: "category" | "equipment" | "event" | "rental"; label: string; href: string }[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+  const seqRef = useRef(0);
+
+  const doSearch = useCallback(async (keyword: string) => {
+    const term = keyword.trim();
+    if (!term) {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      setHits([]);
+      setSearching(false);
+      return;
+    }
+    const escForOr = (s: string) => s.replaceAll(/[,()]/g, m => `\\${m}`);
+    const escForLike = (s: string) => s.replaceAll(/[\\%_]/g, m => `\\${m}`);
+    const likeTerm = escForLike(term);
+    const qq = escForOr(likeTerm);
+    const runId = ++seqRef.current;
+    setSearching(true);
+    try {
+      const [evsRes, eqsRes, rtsRes, catsRes] = await Promise.all([
+        supabase
+          .from('events')
+          .select('*')
+          .or(`name.ilike.%${qq}%,location.ilike.%${qq}%,notes.ilike.%${qq}%`)
+          .limit(10),
+        supabase
+          .from('equipments')
+          .select('*')
+          .or([
+            `manufacturer.ilike.%${qq}%`,
+            `model.ilike.%${qq}%`,
+            `notes.ilike.%${qq}%`,
+            `url.ilike.%${qq}%`,
+            `power_consumption.ilike.%${qq}%`,
+            `weight.ilike.%${qq}%`,
+            `dimensions.ilike.%${qq}%`,
+            `origin_country.ilike.%${qq}%`
+          ].join(','))
+          .limit(10),
+        supabase
+          .from('rentals')
+          .select('*')
+          .or(`company.ilike.%${qq}%,arrive_place.ilike.%${qq}%,return_place.ilike.%${qq}%,notes.ilike.%${qq}%`)
+          .limit(10),
+        supabase
+          .from('categories')
+          .select('*')
+          .ilike('name', `%${likeTerm}%`)
+          .limit(10)
+      ]);
+
+      if (seqRef.current !== runId) return; // stale response
+
+      const results: { type: "category" | "equipment" | "event" | "rental"; label: string; href: string }[] = [];
+      (catsRes.data as Category[] | null)?.forEach(c => {
+        results.push({ type: 'category', label: c.name, href: `/inventory?category=${c.id}` });
+      });
+      (eqsRes.data as Equipment[] | null)?.forEach(e => {
+        results.push({ type: 'equipment', label: `${e.manufacturer} ${e.model}`, href: `/inventory/${e.id}` });
+      });
+      (evsRes.data as Event[] | null)?.forEach(e => {
+        results.push({ type: 'event', label: e.name, href: `/events/${e.id}` });
+      });
+      (rtsRes.data as Rental[] | null)?.forEach(r => {
+        results.push({ type: 'rental', label: r.company, href: `/rentals` });
+      });
+      setHits(results);
+    } finally {
+      if (seqRef.current === runId) setSearching(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -167,60 +241,88 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (!q.trim()) {
+      setHits([]);
+      setSearching(false);
+      return;
+    }
+    debounceRef.current = window.setTimeout(() => {
+      doSearch(q);
+    }, 400);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [q, doSearch]);
+
+  const groupedHits = useMemo(() => {
+    const map = new Map<string, { label: string; href: string }[]>();
+    for (const h of hits) {
+      const arr = map.get(h.type) || [];
+      arr.push({ label: h.label, href: h.href });
+      map.set(h.type, arr);
+    }
+    return map;
+  }, [hits]);
+
+  const searchForms = [
+    { type: 'category', title: 'カテゴリ', icon: '🗂️' },
+    { type: 'equipment', title: '機材', icon: '🧰' },
+    { type: 'event', title: 'イベント', icon: '📅' },
+    { type: 'rental', title: 'レンタル', icon: '🚚' }
+  ] as const;
+
   return (
     <div className="stack">
       <h2 className="page-title">ダッシュボード</h2>
-      <div className="card" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input placeholder="検索（機材/イベント/レンタル など）" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 380 }} />
-        <button className="btn" onClick={async () => {
-          const list: { label: string; href: string }[] = [];
-          if (q.trim()) {
-            const esc = (s: string) => s.replaceAll(/[,()]/g, (m) => `\\${m}`);
-            const qq = esc(q);
-            // Events: name, location, notes
-            const { data: evs } = await supabase
-              .from('events')
-              .select('*')
-              .or(`name.ilike.%${qq}%,location.ilike.%${qq}%,notes.ilike.%${qq}%`)
-              .limit(10);
-            (evs || []).forEach((e: any) => list.push({ label: `イベント: ${e.name}`, href: `/events/${e.id}` }));
-
-            // Equipments: manufacturer, model, notes, url, power, weight, dimensions, origin
-            const { data: eqs } = await supabase
-              .from('equipments')
-              .select('*')
-              .or([
-                `manufacturer.ilike.%${qq}%`,
-                `model.ilike.%${qq}%`,
-                `notes.ilike.%${qq}%`,
-                `url.ilike.%${qq}%`,
-                `power_consumption.ilike.%${qq}%`,
-                `weight.ilike.%${qq}%`,
-                `dimensions.ilike.%${qq}%`,
-                `origin_country.ilike.%${qq}%`
-              ].join(','))
-              .limit(10);
-            (eqs || []).forEach((e: any) => list.push({ label: `機材: ${e.manufacturer} ${e.model}`, href: `/inventory/${e.id}` }));
-
-            // Rentals: company, places, notes
-            const { data: rts } = await supabase
-              .from('rentals')
-              .select('*')
-              .or(`company.ilike.%${qq}%,arrive_place.ilike.%${qq}%,return_place.ilike.%${qq}%,notes.ilike.%${qq}%`)
-              .limit(10);
-            (rts || []).forEach((r: any) => list.push({ label: `レンタル: ${r.company}`, href: `/rentals` }));
+      <form
+        className="card"
+        style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+        onSubmit={e => {
+          e.preventDefault();
+          if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
           }
-          setHits(list);
-        }}>検索</button>
-      </div>
+          doSearch(q);
+        }}
+      >
+        <input
+          placeholder="検索（カテゴリ/機材/イベント/レンタル など）"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          style={{ maxWidth: 380 }}
+        />
+        <button className="btn" type="submit" disabled={searching}>検索</button>
+        {searching && <span className="subtle">検索中...</span>}
+      </form>
       {hits.length > 0 && (
         <div className="card">
           <div className="section-title">検索結果</div>
-          <div className="list">
-            {hits.map((h,i) => (
-              <a key={i} href={h.href}>{h.label}</a>
-            ))}
-          </div>
+          {searchForms.map(meta => {
+            const items = groupedHits.get(meta.type);
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={meta.type} style={{ marginTop: 8 }}>
+                <div className="subtle" style={{ marginBottom: 4 }}>{meta.icon} {meta.title}</div>
+                <div className="list">
+                  {items.map((h, i) => (
+                    <a key={`${meta.type}-${i}`} href={h.href} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{meta.icon}</span>
+                      <span>{h.label}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
       <p className="subtle">全期間のイベントで、期間が重なることにより不足する区間と台数を表示します。レンタル分が不足を相殺する場合は「不足0（内レンタルn台）」と表示します。</p>
