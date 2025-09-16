@@ -148,9 +148,12 @@ function InventoryContent() {
 
   return (
     <div className="stack">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 className="page-title">機材一覧</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <h2 className="page-title" style={{ marginBottom: 0 }}>機材一覧</h2>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <a className="btn" href="/api/export/inventory" download>
+            CSVダウンロード
+          </a>
           <AdminPanel />
         </div>
       </div>

@@ -15,7 +15,7 @@ type Shortage = {
 export default function Dashboard() {
   const [shortages, setShortages] = useState<Shortage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [recent, setRecent] = useState<{ type: string; label: string; at: string; href: string }[]>([]);
+  const [recent, setRecent] = useState<{ type: string; label: string; detail?: string; at: string; href: string; icon: string }[]>([]);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<{ type: "category" | "equipment" | "event" | "rental"; label: string; href: string }[]>([]);
   const [searching, setSearching] = useState(false);
@@ -226,13 +226,62 @@ export default function Dashboard() {
 
       setShortages(result);
       // Recent updates (top 10)
-      const rec: { type: string; label: string; at: string; href: string }[] = [];
-      const { data: ev10 } = await supabase.from('events').select('*').order('updated_at', { ascending: false }).limit(10);
-      (ev10 || []).forEach((e: any) => rec.push({ type: 'イベント', label: e.name, at: e.updated_at, href: `/events/${e.id}` }));
-      const { data: eq10 } = await supabase.from('equipments').select('*').order('updated_at', { ascending: false }).limit(10);
-      (eq10 || []).forEach((e: any) => rec.push({ type: '機材', label: `${e.manufacturer} ${e.model}`, at: e.updated_at, href: `/inventory/${e.id}` }));
-      const { data: rt10 } = await supabase.from('rentals').select('*').order('created_at', { ascending: false }).limit(10);
-      (rt10 || []).forEach((r: any) => rec.push({ type: 'レンタル', label: `${r.company}`, at: r.created_at, href: `/rentals` }));
+      const rec: { type: string; label: string; detail?: string; at: string; href: string; icon: string }[] = [];
+      const [{ data: catRows }, { data: ev10 }, { data: eq10 }, { data: rt10 }] = await Promise.all([
+        supabase.from('categories').select('id,name'),
+        supabase.from('events').select('*').order('updated_at', { ascending: false }).limit(10),
+        supabase.from('equipments').select('*').order('updated_at', { ascending: false }).limit(10),
+        supabase.from('rentals').select('*').order('created_at', { ascending: false }).limit(10)
+      ]);
+      const catMap = new Map<string, string>();
+      (catRows || []).forEach((c: any) => catMap.set(c.id, c.name));
+      const fmtDate = (iso: string) => new Date(iso).toLocaleDateString();
+      (ev10 || []).forEach((e: any) => {
+        const detailParts: string[] = [];
+        if (e.location) detailParts.push(e.location);
+        detailParts.push(`${fmtDate(e.start_at)} - ${fmtDate(e.end_at)}`);
+        if (e.notes) detailParts.push(e.notes.length > 40 ? `${e.notes.slice(0, 40)}…` : e.notes);
+        rec.push({
+          type: 'イベント',
+          label: e.name,
+          detail: detailParts.join(' / '),
+          at: e.updated_at,
+          href: `/events/${e.id}`,
+          icon: '📅'
+        });
+      });
+      (eq10 || []).forEach((e: any) => {
+        const detailParts: string[] = [];
+        if (e.category_id) {
+          const name = catMap.get(e.category_id as string);
+          if (name) detailParts.push(name);
+        }
+        detailParts.push(`在庫${e.stock_count}`);
+        if (e.manufacturer) detailParts.push(e.manufacturer);
+        if (e.url) detailParts.push('URLあり');
+        rec.push({
+          type: '機材',
+          label: `${e.manufacturer} ${e.model}`.trim(),
+          detail: detailParts.join(' / '),
+          at: e.updated_at,
+          href: `/inventory/${e.id}`,
+          icon: '🧰'
+        });
+      });
+      (rt10 || []).forEach((r: any) => {
+        const detailParts: string[] = [];
+        detailParts.push(`${r.quantity}台`);
+        detailParts.push(`${fmtDate(r.arrive_at)} - ${fmtDate(r.return_at)}`);
+        if (r.arrive_place || r.return_place) detailParts.push(`${r.arrive_place ?? ''}→${r.return_place ?? ''}`.replace(/→$/, ''));
+        rec.push({
+          type: 'レンタル',
+          label: r.company,
+          detail: detailParts.join(' / '),
+          at: r.created_at,
+          href: `/rentals`,
+          icon: '🚚'
+        });
+      });
       rec.sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime());
       setRecent(rec.slice(0,10));
       setLoading(false);
@@ -331,7 +380,11 @@ export default function Dashboard() {
           <div className="section-title">最新の更新</div>
           <div className="list">
             {recent.map((r,i) => (
-              <a key={i} href={r.href}>{new Date(r.at).toLocaleString()} - {r.type}: {r.label}</a>
+              <a key={i} href={r.href} style={{ display: 'grid', gap: 2 }}>
+                <div style={{ fontWeight: 600 }}>{r.icon} {r.type}: {r.label}</div>
+                <div className="subtle">{new Date(r.at).toLocaleString()}</div>
+                {r.detail && <div className="subtle">{r.detail}</div>}
+              </a>
             ))}
           </div>
         </div>

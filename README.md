@@ -45,6 +45,12 @@ npm run dev
 - リポジトリをGitHubなどにプッシュ
 - VercelでImportし、環境変数に `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 
+## データエクスポート
+- 手動エクスポート: `GET /api/export/inventory` でCSVをダウンロードできます。
+  - 例: ローカル開発中なら `http://localhost:3000/api/export/inventory`
+  - Google Apps ScriptなどからこのURLを毎日取得すれば、スプレッドシートへ自動保存が可能です。
+- 出力される列見出しは「カテゴリ」「メーカー」「型番」「在庫数」「URL」「消費電力」「重量」「サイズ」「単価」「原産国」「備考」「更新日時」です。値は機材詳細に登録した内容がそのまま入ります。
+
 ## ページ構成（初期版）
 - `/` ダッシュボード（近日のイベントと不足アラート）
 - `/inventory` 機材一覧 + 追加
