@@ -207,13 +207,12 @@ function InventoryContent() {
           const other = activeUnits.filter(u => u.status !== '正常' && u.status !== '故障' && u.status !== '点検中').length;
           const effectiveStock = Math.max(0, e.stock_count - broken);
           return (
-          <div key={e.id} className="card" style={{ background: colors.bg, borderColor: colors.border }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px,1fr) repeat(3,auto)', gap: 8, alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <b>{e.manufacturer}</b>{' '}
-                  <Link href={`/inventory/${e.id}`} style={{ textDecoration: 'underline' }}>{e.model}</Link>
-                </div>
+          <div key={e.id} className="card" style={{ background: colors.bg, borderColor: colors.border, padding: '10px 12px' }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Link href={`/inventory/${e.id}`} style={{ fontWeight: 600, textDecoration: 'none', color: 'inherit', flexGrow: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.model}</span>
+                </Link>
                 {e.url && (
                   <a
                     href={e.url}
@@ -221,19 +220,27 @@ function InventoryContent() {
                     rel="noopener noreferrer"
                     title="機材URLを開く"
                     aria-label="機材URLを開く"
-                    style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 14, background: 'rgba(0,0,0,0.08)' }}
+                    style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 12, background: 'rgba(0,0,0,0.05)' }}
                     onClick={event => event.stopPropagation()}
                   >
                     🔗
                   </a>
                 )}
-              {(((e as any).is_rental_only === true) || (((e as any).properties || {})['rental_only'] === true)) ? <span className="tag" style={{ marginLeft: 8 }}>レンタル</span> : null}
-                {cat && <span className="tag" style={{ marginLeft: 8 }}>{cat.name}</span>}
               </div>
-              <div className="subtle">在庫 <b>{effectiveStock}</b>{broken>0 && <span>（故障 {broken}）</span>}{inspect>0 && <span>（点検 {inspect}）</span>}{other>0 && <span>（他 {other}）</span>}</div>
-              <div className="subtle">{(actives.length > 0 || upcoming.length > 0) ? (<>
-                <Link href="/rentals">{label}</Link>{start && end && (<span>（{start.toLocaleDateString()} - {end.toLocaleDateString()}）</span>)}
-              </>) : <span style={{opacity:.6}}>レンタルなし</span>}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', fontSize: 12, color: '#555' }}>
+                {cat && <span className="tag" style={{ marginLeft: 0 }}>{cat.name}</span>}
+                <span>在庫 <b>{effectiveStock}</b></span>
+                <span>{e.manufacturer}</span>
+                {(((e as any).is_rental_only === true) || (((e as any).properties || {})['rental_only'] === true)) ? <span className="tag" style={{ marginLeft: 0 }}>レンタル</span> : null}
+                {broken>0 && <span>故障 {broken}</span>}
+                {inspect>0 && <span>点検 {inspect}</span>}
+                {other>0 && <span>他 {other}</span>}
+              </div>
+              {(actives.length > 0 || upcoming.length > 0) && (
+                <div style={{ fontSize: 11, color: '#666' }}>
+                  <Link href="/rentals">{label}</Link>{start && end && (<span>（{start.toLocaleDateString()} - {end.toLocaleDateString()}）</span>)}
+                </div>
+              )}
               {admin && (
                 <div style={{ justifySelf: 'end' }}>
                   <button className="btn danger" onClick={async () => {
